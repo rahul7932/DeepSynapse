@@ -10,14 +10,12 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from PIL import Image
 from skimage import io
-from utils import boxCalc, distance
+from utils.transformations import boxCalc, distance
 import numpy as np
 import sys
 
 
 WIDTH = 11
-
-
 
 currDir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 labelDirsOld = os.path.join(currDir, "labelsTransformed")
