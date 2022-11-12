@@ -1,6 +1,8 @@
-from Models.model_cfg import get_cfg_mod
+from models.model_cfg import get_cfg_mod
 from trainers.spineTrain import SpineTrainer
 from detectron2.utils.logger import setup_logger
+from detectron2.evaluation import COCOEvaluator, inference_on_dataset
+from detectron2.data import build_detection_test_loader
 setup_logger()
 
 import os, cv2
@@ -24,9 +26,9 @@ def test(dataset_dicts, spine_metadata, cfg, outputDir, weightPath, vis=False, v
 
 	predictor = DefaultPredictor(cfg)
 
-	if vis: 
-		for i, d in enumerate(random.sample(dataset_dicts, 1)): 
-			print(d["file_name"])  
+	if vis:
+		for i, d in enumerate(random.sample(dataset_dicts, 1)):
+			print(d["file_name"])
 			d["file_name"] = "/media/ding/6a72c58a-f37b-40d5-b0a6-34ec4a223eae/home/ding/SpineQuant/detection/spineData/images2D_croppedBackbone/test/rr114a_s14_ch2.tif"
 			im = cv2.imread(d["file_name"])
 			outputs = predictor(im)  # format is documented at https://detectron2.readthedocs.io/tutorials/models.html#model-output-format
@@ -39,8 +41,6 @@ def test(dataset_dicts, spine_metadata, cfg, outputDir, weightPath, vis=False, v
 			#plt.imsave(os.path.join(cfg.OUTPUT_DIR, "sample "+str(i+1)),out.get_image()[:, :, ::-1], format="tiff")
 
 
-	from detectron2.evaluation import COCOEvaluator, inference_on_dataset
-	from detectron2.data import build_detection_test_loader
 	testMode = 'val' if val else 'test'
 	evaluator = COCOEvaluator("spine_{}".format(testMode), cfg, False, output_dir=cfg.OUTPUT_DIR)
 	val_loader = build_detection_test_loader(cfg, "spine_{}".format(testMode))

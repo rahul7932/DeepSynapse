@@ -1,15 +1,7 @@
-import os
-from Utils.load_dataset import load_dataset
-import torch
-import nni
-from nni.utils import merge_parameter
-import detectron2.data.transforms as T
-from detectron2.data import DatasetMapper, build_detection_train_loader, build_detection_test_loader
+from detectron2.data import DatasetMapper, build_detection_train_loader
 from detectron2.engine import DefaultTrainer
 from detectron2.evaluation import COCOEvaluator, inference_on_dataset
-from Models.model_cfg import *
 from trainers.augmentation import build_spine_train_aug
-from utils.get_params import get_params
 
 
 

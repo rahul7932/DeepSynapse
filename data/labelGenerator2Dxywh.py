@@ -5,72 +5,65 @@ Generate 2D bbox labels folder from 3D labels.
 
 import os
 import csv
-import math
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
-from PIL import Image
-from skimage import io
 from utils.transformations import boxCalc, distance
-import numpy as np
-import sys
-
 
 WIDTH = 11
-
 currDir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 labelDirsOld = os.path.join(currDir, "labelsTransformed")
 fields = ["Idx", "x", "y", "z", "cx", "cy", "cz"]
 newFields = ["x1", "y1", "x2", "y2", "width", "height"]
+
 # make directory for 2D labels
 labelDirsNew = os.path.join(currDir, "labels2D")
 try:
-	os.mkdir(labelDirsNew)
+    os.mkdir(labelDirsNew)
 except OSError as error:
-	print("Already made this directory brother.") 
+    print("Already made this directory brother.")
 
 
 for oldLabelDir in os.listdir(labelDirsOld):
 
+    # get sample data
+    # exp = "rr106b_s1" as reference
+    expDir = os.path.join(labelDirsOld, oldLabelDir)
 
-	# get sample data
-	expDir = os.path.join(labelDirsOld, oldLabelDir)   #exp = "rr106b_s1" as reference
+    for csvFile in os.listdir(expDir):
+        if csvFile.endswith(".csv"):
 
-	for csvFile in os.listdir(expDir):
-		if csvFile.endswith(".csv"):
+            newFile = os.path.join(labelDirsNew, csvFile)
+            newRows = []
 
-			newFile = os.path.join(labelDirsNew, csvFile)
-			newRows = []
+            with open(os.path.join(expDir, csvFile), "r") as data:
+                csvReader = csv.DictReader(data)
 
-			with open(os.path.join(expDir, csvFile), "r") as data:
-				csvReader = csv.DictReader(data)
+                for row in csvReader:
+                    index = int(row[fields[0]])
+                    x = float(row[fields[1]])
+                    y = float(row[fields[2]])
+                    z = float(row[fields[3]])
+                    cx = float(row[fields[4]])
+                    cy = float(row[fields[5]])
+                    cz = float(row[fields[6]])
+                    layerbase = int(cz)
+                    layertip = int(z)
+                    base = (cx, cy)
+                    tip = (x, y)
+                    width = WIDTH
+                    dist = distance(base, tip)
+                    origin, angle, height, corner, config = boxCalc(
+                        base, tip, dist, width)
 
-				for row in csvReader:
-					index = int( row[fields[0]] )
-					x = float( row[fields[1]] ) 
-					y = float( row[fields[2]] )
-					z = float( row[fields[3]] )
-					cx = float( row[fields[4]] )
-					cy = float( row[fields[5]] )
-					cz = float( row[fields[6]] )
-					layerbase = int(cz)
-					layertip = int(z)
-					base = (cx, cy)
-					tip = (x, y)
-					width = WIDTH
-					dist = distance(base, tip)
-					origin, angle, height, corner, config = boxCalc(base, tip, dist, width)
+                    # For 2D bounding box, DoFs are: origin, corner, width, height
+                    newRow = [origin[0], origin[1], corner[0],
+                              corner[1], width, abs(height)]
+                    newRows.append(newRow)
 
-					# For 2D bounding box, DoFs are: origin, corner, width, height
-					newRow = [origin[0], origin[1], corner[0], corner[1], width, abs(height)]
-					newRows.append(newRow)
+            with open(newFile, "w") as newCSVfile:
+                csvwriter = csv.writer(newCSVfile)
+                csvwriter.writerow(newFields)
+                csvwriter.writerows(newRows)
 
-				
-			with open(newFile, "w") as newCSVfile:
-					csvwriter = csv.writer(newCSVfile)  
-					csvwriter.writerow(newFields)
-					csvwriter.writerows(newRows)
-
-	"""
+    """
 	# add all spines between layers rangeMin and rangeMax
 	for i in range(2, len(fileData)):
 
@@ -111,17 +104,8 @@ for oldLabelDir in os.listdir(labelDirsOld):
 			ax.add_patch(point4)
 			annotations.append((origin, corner))
 
-			
+
 			boundAdd = 50
 			plt.text(origin[0]+width, origin[1]+width,sampleIdx, fontsize=6, color="yellow")
 
 	"""
-
-
-
-
-
-
-
-
-

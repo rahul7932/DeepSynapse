@@ -1,5 +1,5 @@
 def get_params():
-    param_dict = {} 
+    param_dict = {}
     param_dict['roi_batch_size'] = 32
     param_dict['lr'] = 0.001
     param_dict['momentum'] = 0.9
