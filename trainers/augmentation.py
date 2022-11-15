@@ -1,5 +1,5 @@
 def build_spine_train_aug(cfg):
-    # augmentations 
+    # augmentations
     augs = [
         #T.ResizeShortestEdge(
         #            cfg.INPUT.MIN_SIZE_TRAIN, cfg.INPUT.MAX_SIZE_TRAIN, cfg.INPUT.MIN_SIZE_TRAIN_SAMPLING

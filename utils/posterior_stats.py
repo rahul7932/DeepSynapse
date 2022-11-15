@@ -20,12 +20,11 @@ def containsTip(box, spineTip):
         return False
 
 
-"""
-Using test dump data along with spine labels, calculate a list where each entry specifies how many spines a particular bounding box encapsulates (expect values between 0 and 5)
-"""
-
-
 def generatePredHistData():
+    """
+    Using test dump data along with spine labels, calculate a list where each entry specifies
+    how many spines a particular bounding box encapsulates (expect values between 0 and 5)
+    """
     imgToBox = {}
     with open("predBoxes_test.txt") as f:
         imgToBox = json.load(f)["data"]
@@ -34,8 +33,8 @@ def generatePredHistData():
         boxes = imgToBox[imgName]
         expNum = imgName.split("_")[0]
         spineTips = []
-        #print(os.path.join("labels+", expNum, imgName+".csv"))
         labelPath = os.path.join(currDir, "labels+", expNum, imgName+".csv")
+
         with open(labelPath) as data:
             csvReader = csv.DictReader(data)
 
@@ -52,11 +51,11 @@ def generatePredHistData():
             for spineTip in spineTips:
                 if containsTip(box, spineTip):
                     numTips += 1
-            # if numTips > 6:
-            # print(numTips)
+
+            if numTips > 6:
+                pass
+
             spinePerBox.append(numTips)
-        # print(spinePerBox)
-        # print(len(spinePerBox))
     return spinePerBox, imgToBox.keys()
 
 
@@ -66,17 +65,15 @@ def generateGTHistData(images):
         dataPath = os.path.join(currDir, "mmdetection",
                                 "training", "labels2D+_xyxy", imgName+".csv")
         boxes = list(csv.reader(open(dataPath)))[1:]
-        # print(boxes)
         expNum = imgName.split("_")[0]
         spineTips = []
-        #print(os.path.join("labels+", expNum, imgName+".csv"))
         labelPath = os.path.join(currDir, "labels+", expNum, imgName+".csv")
+
         with open(labelPath) as data:
             csvReader = csv.DictReader(data)
 
             for row in csvReader:
                 # uncleaned data
-
                 x = int(row[fields[1]])
                 y = int(row[fields[2]])
                 spineTips.append((x, y))
@@ -94,39 +91,33 @@ def generateGTHistData(images):
             for spineTip in spineTips:
                 if containsTip(box, spineTip):
                     numTips += 1
+
             if numTips > 6:
-                print(numTips)
+                pass
+
             spinePerBox.append(numTips)
 
         if numTips > 6:
-            print(numTips)
+            pass
 
-        # print(spinePerBox)
-        # print(len(spinePerBox))
     return spinePerBox
 
 
 def overlapBoxes():
     imgToBox = {}
-    pathToPreds = os.path.join(
-        currDir, 'output', 'fRCNN_X101', "predBoxes_josh_fRCNN_X101_test_cropped.txt")
+    pathToPreds = os.path.join(currDir, 'output', 'fRCNN_X101',
+                               "predBoxes_josh_fRCNN_X101_test_cropped.txt")
     with open(pathToPreds) as f:
         imgToBox = json.load(f)["data"]
-    # print(list(imgToBox.keys())[0])
-    #filenameDrop = "_".join(filename.split("_")[0:2])
-
-    predBoxes = imgToBox[filename+'.tif']
+    predBoxes = imgToBox[filename + '.tif']
 
     # ch2 naming shenanigans
-
-    dataPath = os.path.join(
-        currDir, "spineData", "imagesJosh2D_croppedResize", "labels(xywh)", filename+".csv")
+    dataPath = os.path.join(currDir, "spineData", "imagesJosh2D_croppedResize",
+                            "labels(xywh)", filename+".csv")
     GTBoxes = list(csv.reader(open(dataPath)))[1:]
-    #print(predBoxes[0], GTBoxes[0])
-    imagePath = os.path.join(
-        currDir, "spineData/imagesJosh2D_croppedResize/test", filename+".tif")
-    # old, little bit of a bait
-    #imagePath = os.path.join(currDir,'spineData/images2D/test',filename+".tif")
+
+    imagePath = os.path.join(currDir, "spineData/imagesJosh2D_croppedResize/test", filename+".tif")
+    # imagePath = os.path.join(currDir,'spineData/images2D/test',filename+".tif")
 
     data = Image.open(imagePath)
     fig, ax = plt.subplots(1, figsize=(8, 8))
@@ -180,19 +171,20 @@ def overlapBoxes():
     outputDir = os.path.join(os.path.dirname(
         currDir), 'results/detectron/fRCNN_X101/samples_test_josh_cropped')
     os.makedirs(outputDir, exist_ok=True)
+
     plt.savefig(os.path.join(outputDir, filename), format="tiff")
-    # plt.show()
 
 
 def generateHistogram(spinePerBoxPred, spinePerBoxGT):
     fig, axs = plt.subplots(1, 2, sharey=True, tight_layout=True)
     n_bins = 50
+
     # We can set the number of bins with the `bins` kwarg
     axs[0].hist(spinePerBoxPred, bins=n_bins, range=(0, 6))
     axs[0].set_title("Pred SpinePerBox")
     axs[1].hist(spinePerBoxGT, bins=n_bins, range=(0, 6))
     axs[1].set_title("GT SpinePerBox")
-    # plt.hist(spinePerBoxPred, bins=100, , range=(0,6))
+
     plt.savefig("spinePerBox_Hists.jpg")
     plt.show()
 
@@ -200,7 +192,6 @@ def generateHistogram(spinePerBoxPred, spinePerBoxGT):
 if __name__ == "__main__":
     if len(sys.argv) == 1:
         spinePerBoxPred, images = generatePredHistData()
-        print(len(images))
         spinePerBoxGT = generateGTHistData(images)
         generateHistogram(spinePerBoxPred, spinePerBoxGT)
     else:

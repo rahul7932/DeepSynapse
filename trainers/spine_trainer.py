@@ -1,8 +1,7 @@
 from detectron2.data import DatasetMapper, build_detection_train_loader
 from detectron2.engine import DefaultTrainer
-from detectron2.evaluation import COCOEvaluator, inference_on_dataset
+from detectron2.evaluation import COCOEvaluator
 from trainers.augmentation import build_spine_train_aug
-
 
 
 class SpineTrainer(DefaultTrainer):

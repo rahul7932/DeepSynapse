@@ -1,11 +1,14 @@
 """
 Generate 2D bbox labels folder from 3D labels.
+
+Preprocessing step.
+TODO(vir): figure out if this is required, and where to place it
 """
 
 
 import os
 import csv
-from utils.transformations import boxCalc, distance
+from data.math_functions import boxCalc, distance
 
 WIDTH = 11
 currDir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
@@ -13,16 +16,16 @@ labelDirsOld = os.path.join(currDir, "labelsTransformed")
 fields = ["Idx", "x", "y", "z", "cx", "cy", "cz"]
 newFields = ["x1", "y1", "x2", "y2", "width", "height"]
 
-# make directory for 2D labels
+# create directories
 labelDirsNew = os.path.join(currDir, "labels2D")
 try:
     os.mkdir(labelDirsNew)
+    print('info:', labelDirsNew + " created")
 except OSError as error:
-    print("Already made this directory brother.")
+    print(f"info: already made {labelDirsNew} directory brother")
 
 
 for oldLabelDir in os.listdir(labelDirsOld):
-
     # get sample data
     # exp = "rr106b_s1" as reference
     expDir = os.path.join(labelDirsOld, oldLabelDir)
