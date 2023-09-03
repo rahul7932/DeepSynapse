@@ -1,6 +1,6 @@
-from Utils.build_dataset import build_dataset
+from utils.build_dataset import build_dataset
 from detectron2.data import MetadataCatalog, DatasetCatalog
-from Models.model_cfg import get_cfg_mod
+from models.model_cfg import get_cfg_mod
 
 
 def load_dataset(dataDir, loadMode):
