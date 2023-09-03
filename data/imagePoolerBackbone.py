@@ -4,189 +4,99 @@ Constrained so that only backbone and surrounding pixels are included.
 Used for precisely constructing cropped data.
 """
 
-
 import os
 import csv
 import SimpleITK as sitk
 import numpy as np
-from PIL import Image, TiffImagePlugin
-from skimage import io
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
+from PIL import Image
 
+EXPAND = 40  # Number of pixels to expand out from backbone
 
+def contained_backbone(min_maxes_arr, i, j):
+    for min_max_tup in min_maxes_arr:
+        bb_min_x, bb_min_y, bb_max_x, bb_max_y = min_max_tup
+        if bb_min_x <= j <= bb_max_x and bb_min_y <= i <= bb_max_y:
+            return True
+    return False
 
-EXPAND = 40  # number of pixels to expand out from backbone, need to experiment
+def process_image(img_file, img_dirs_old, bb_dir, img_dirs_new):
+    try:
+        # Load backbone data
+        img_name = img_file.split("_")
+        bb_file = "_".join(img_name[0:2] + ["bb.csv"])
+        bb_path = os.path.join(bb_dir, bb_file)
+        bb_data = []
+        with open(bb_path) as backbone:
+            reader = csv.reader(backbone)
+            next(reader)
+            for row in reader:
+                bb_data.append([int(item) for item in row[:3]])
 
-def containedBackbone(minMaxesArr, i, j):
-	contained = False
-	for minMaxTup in minMaxesArr:
-		bbMinX, bbMinY, bbMaxX, bbMaxY = minMaxTup
-		if ((j >= bbMinX and j <= bbMaxX) and (i >= bbMinY and i <= bbMaxY)):
-			contained = True
-	return contained
+        # Determine cropped area for each layer
+        bb_dict = {}
+        for row in bb_data:
+            ID = row[3]
+            layer_key = row[2]
+            if ID not in bb_dict:
+                bb_dict[ID] = {}
+            min_max_coords = bb_dict[ID].get(layer_key, ((1024, 1024), (0, 0)))
+            bb_dict[ID][layer_key] = (
+                (min(row[0], min_max_coords[0][0]), min(row[1], min_max_coords[0][1])),
+                (max(row[0], min_max_coords[1][0]), max(row[1], min_max_coords[1][1]))
+            )
 
+        img_path = os.path.join(img_dirs_old, img_file)
+        img_3D = sitk.ReadImage(img_path)
+        img_arr_3D = sitk.GetArrayFromImage(img_3D)
+        num_layers = img_arr_3D.shape[0]
+        max_pool = np.zeros(img_arr_3D.shape[1:], dtype=np.uint16)  
 
-# plot backbone points on image
+        for layer in range(num_layers):
+            relevant_ids = [ID for ID in bb_dict if layer in bb_dict[ID]]
+            if not relevant_ids:
+                continue
 
-currDir = os.path.dirname(os.path.realpath(__file__))
-spineDataDir = os.path.join(currDir, 'spineData')
-imgDirsOld = os.path.join(spineDataDir, "imagesOG(3D)")
-bbDir = os.path.join(spineDataDir, "backbones")
-imgDirsNew = os.path.join(spineDataDir, "images2D_test")
+            curr_layer = img_arr_3D[layer]
+            min_maxes = []
+            for ID in relevant_ids:
+                bb_min_coords, bb_max_coords = bb_dict[ID][layer]
+                bb_min_x = max(bb_min_coords[0] - EXPAND, 0)
+                bb_min_y = max(bb_min_coords[1] - EXPAND, 0)
+                bb_max_x = min(bb_max_coords[0] + EXPAND, 1024)
+                bb_max_y = min(bb_max_coords[1] + EXPAND, 1024)
+                min_maxes.append((bb_min_x, bb_min_y, bb_max_x, bb_max_y))
 
-try:
-	os.mkdir(imgDirsNew)
-	print(imgDirsNew + " created!")
-except OSError as error:
-	print("Already made this directory brother.") 
+            for i in range(curr_layer.shape[0]):
+                for j in range(curr_layer.shape[1]):
+                    if not contained_backbone(min_maxes, i, j):
+                        curr_layer[i][j] = 0
+            max_pool = np.maximum(curr_layer, max_pool)
 
+        I8 = (((max_pool - max_pool.min()) / (max_pool.max() - max_pool.min())) * 255.9).astype(np.uint8)
+        img_2D = Image.fromarray(I8)
+        img_2D.save(os.path.join(img_dirs_new, img_file))
+        print(f"{img_file} processed")
+    except Exception as e:
+        print(f"{img_file} not processed due to error: {e}")
 
-testNum = 5
-for imgFile in os.listdir(imgDirsOld)[:1]:
-	try:
-		# load in backbone data
-		imgName = imgFile.split("_")
-		print(imgName)
-		bbFile = "_".join(imgName[0:2] + ["bb.csv"])
-		bbPath = os.path.join(bbDir, bbFile)
-		bbData = []
+def main():
+    curr_dir = os.path.dirname(os.path.realpath(__file__))
+    spine_data_dir = os.path.join(curr_dir, 'spineData')
+    img_dirs_old = os.path.join(spine_data_dir, "imagesOG(3D)")
+    bb_dir = os.path.join(spine_data_dir, "backbones")
+    img_dirs_new = os.path.join(spine_data_dir, "images2D_test")
 
-		with open(bbPath) as backbone:
-			reader = csv.reader(backbone)
-			next(reader)
-			for row in reader:
-				edited = row
+    if not os.path.exists(img_dirs_new):
+        os.mkdir(img_dirs_new)
+        print(f"{img_dirs_new} created!")
 
-				edited[0] = int(edited[0])
-				edited[1] = int(edited[1])
-				edited[2] = int(edited[2])
-				#edited[2] -= 1   # z is layer in image starting at 1, need to start at 0 for data.seek below
-				bbData.append(edited)
+    for img_file in os.listdir(img_dirs_old)[:1]:
+        process_image(img_file, img_dirs_old, bb_dir, img_dirs_new)
 
-		# now parse bbData to determine cropped area for each layer
-		# layerDict:  layer number --> ((minX, minY), (maxX, maxY)) for that layer
-		bbDict = {}
-		maxX = 0
-		maxY = 0
-		minX = 1024
-		minY = 1024
+    print("Done processing")
 
-		for row in bbData:
-			ID = row[3]
-			if ID not in bbDict:
-				bbDict[ID] = {} # empty dict which is itself a alyer dict correpsonding to ID backbone
-			
-			layerDict = bbDict[ID]
-			key = row[2]
+if __name__ == "__main__":
+    main()
 
-			maxX = max(maxX, row[0])
-			maxY = max(maxY, row[1])
-			minX = min(minX, row[0])
-			minY = min(minY, row[1])
-
-			if key not in layerDict:
-
-				layerDict[key] = ((row[0], row[1]), (row[0], row[1]))
-			else:
-				prevMinTuple, prevMaxTuple = layerDict[key]
-				newMinTuple = (min(row[0], prevMinTuple[0]), min(row[1], prevMinTuple[1]))
-				newMaxTuple = (max(row[0], prevMaxTuple[0]), max(row[1], prevMaxTuple[1]))
-
-				layerDict[key] = (newMinTuple, newMaxTuple)
-
-		imgPath = os.path.join(imgDirsOld, imgFile)
-		data = Image.open(imgPath)
-		h,w = np.shape(data)
-		maxPool = np.zeros((h, w), dtype=np.uint16)	
-
-		img3D = sitk.ReadImage(imgPath)
-		img_arr_3D = sitk.GetArrayFromImage(img3D)
-
-		# every image is 1024x1024 width/height, number of layers will vary
-		img_arr_3D = np.asarray(img_arr_3D)
-		numLayers = np.shape(img_arr_3D)[0]
-		
-		for i in range(0, numLayers):
-
-			#don't pool layers that don't contain the backbone
-			relevantIDs = []
-			contained = False
-			for ID in bbDict:
-				if i in bbDict[ID]:
-					contained = True
-					relevantIDs.append(ID)
-			if not contained:
-				continue
-			
-			### 
-			data.seek(i)  
-			currLayer = np.array(data)
-			width, height = np.shape(currLayer)
-			#crop out non-backbone pixels in current layer
-
-			minMaxes = []
-			for ID in relevantIDs:
-				bbMinTuple = bbDict[ID][i][0]
-				bbMaxTuple = bbDict[ID][i][1]
-
-				bbMinX = max(bbMinTuple[0]-EXPAND, 0)
-				bbMinY = max(bbMinTuple[1]-EXPAND, 0)
-				bbMaxX = min(bbMaxTuple[0]+EXPAND, 1024)
-				bbMaxY = min(bbMaxTuple[1]+EXPAND, 1024)
-				minMaxes.append((bbMinX, bbMinY, bbMaxX, bbMaxY))
-
-			#handle edge cases, consider improving with numpy shorthand
-			for i in range(width):
-				for j in range(height):
-
-					# zero out pixels outside of backbone range
-					if not containedBackbone(minMaxes, i, j):#((j >= bbMinX and j <= bbMaxX) and (i >= bbMinY and i <= bbMaxY)):
-						currLayer[i][j] = 0
-
-			maxPool = np.maximum(currLayer, maxPool)   #maxPool of layers seen so far and new layer
-
-
-		#print(maxPool.dtype) #uint16!
-		#img2D = Image.fromarray(maxPool, mode="I;16")#.ravel())
-		#img2DArr = np.asarray(img2D)
-
-		#print(img2DArr.dtype) #uint16!
-
-
-		# Preview image to save
-		#plt.imshow(img2DArr, cmap='gray')
-		#fig,ax = plt.subplots(1, figsize=(8,8))
-		#ax.imshow(img2DArr)
-		#for dataPoint in bbData:
-		#	point = patches.Circle((dataPoint[0], dataPoint[1]),fill=False, radius=0.5)
-		#	ax.add_patch(point)
-		#plt.show()
-
-		
-
-
-		imgPathNew = os.path.join(imgDirsNew, imgFile)
-		#plt.imsave(imgPathNew, img2DArr, format='tiff')#, cmap='gray')
-		#print(np.shape(maxPool))
-
-		#print(maxPool.dtype)
-		I8 = (((maxPool - maxPool.min()) / (maxPool.max() - maxPool.min())) * 255.9).astype(np.uint8)
-		print(maxPool.min(), maxPool.max())
-		#print(I8.dtype)
-		img = Image.fromarray(I8)#, mode='RGB')#, mode="I;16")
-		img.save(imgPathNew)
-		print(imgFile + " processed")
-		#testNum -= 1
-		#if testNum == 4:
-		#	print(str(testNum) + "images left")
-		#	break
-	except Exception as e:
-		print(imgFile + " not processed")
-		print(e)
-		#break
-
-
-print("done processing")
 
 
