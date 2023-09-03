@@ -2,24 +2,36 @@ from Utils.build_dataset import build_dataset
 from detectron2.data import MetadataCatalog, DatasetCatalog
 from Models.model_cfg import get_cfg_mod
 
+
 def load_dataset(dataDir, loadMode):
-	# loadMode is train, test, val
+    """
+    Load and register a custom dataset with Detectron2, retrieve its metadata, 
+    and obtain the appropriate model configurations based on the mode.
 
-	# used to register a custom dataset with detectron
-	DatasetCatalog.register("spine_" + loadMode, build_dataset(dataDir, loadMode))
-	# registering the metadata of the dataset (each thing is a spine)
-	MetadataCatalog.get("spine_" + loadMode).set(thing_classes=["spine"])
-	# getting metadata
-	spine_metadata = MetadataCatalog.get("spine_" + loadMode)
-	# getting dataset
-	dataset_dicts = DatasetCatalog.get('spine_' + loadMode)
+    Parameters:
+    - dataDir: The directory where the dataset is located.
+    - loadMode: Mode of the dataset ("train", "val", or "test").
 
-	# get the configs of the model for val
-	if loadMode == 'val':
-		cfg = get_cfg_mod(val=True)
-	# get the configs of the model for train, test
-	else:
-		cfg = get_cfg_mod()
+    Returns:
+    - dataset_dicts: The structured dataset.
+    - spine_metadata: Metadata of the dataset.
+    - cfg: Model configuration.
+    """
 
-	# data, metadata, config
-	return dataset_dicts, spine_metadata, cfg
+    dataset_name = f"spine_{loadMode}"
+
+    # Register the custom dataset with Detectron2
+    DatasetCatalog.register(
+        dataset_name, lambda: build_dataset(dataDir, loadMode))
+
+    # Assign and retrieve metadata for the registered dataset
+    MetadataCatalog.get(dataset_name).set(thing_classes=["spine"])
+    spine_metadata = MetadataCatalog.get(dataset_name)
+
+    # Retrieve the dataset
+    dataset_dicts = DatasetCatalog.get(dataset_name)
+
+    # Retrieve model configuration based on the loadMode
+    cfg = get_cfg_mod(val=True) if loadMode == 'val' else get_cfg_mod()
+
+    return dataset_dicts, spine_metadata, cfg
