@@ -1,54 +1,67 @@
+import os
+import cv2
+import matplotlib.pyplot as plt
+from detectron2.utils.visualizer import Visualizer
+from detectron2.utils.logger import setup_logger
 from Models.model_cfg import get_cfg_mod
 from trainers.spineTrain import SpineTrainer
-from detectron2.utils.logger import setup_logger
-setup_logger()
-import os, cv2
-from detectron2.utils.visualizer import Visualizer
-import matplotlib.pyplot as plt
-from Models.model_cfg import *
 
+setup_logger()
 
 
 def train(dataset_dicts, spine_metadata, cfg, outputDir, toResume=False, weightPath='model_0044999.pth', vis=False):
-	# VISUALIZATIONS FOR BOUNDING BOXES
-	if vis:
-		# generating visualizations for the first 5 images in the dataset
-		for d in dataset_dicts[:5]:
-			print("Visualizing GT data for {}".format(d["file_name"]))
-			img = cv2.imread(d["file_name"], cv2.IMREAD_GRAYSCALE)
-			print("Contains {} boxes".format(len(d["annotations"])))
-			visualizer = Visualizer(img[:, :], metadata=spine_metadata, scale=1)
-			out = visualizer.draw_dataset_dict(d)
-			plt.imshow(out.get_image()[:, :, ::-1])
-			plt.show()
+    """
+    Train a model on a given dataset with Detectron2.
 
-	# get the config object
-	cfg = get_cfg_mod()
-	
-	# set the output directory for the model
-	cfg.OUTPUT_DIR = os.path.join(cfg.OUTPUT_DIR, outputDir, 'weights')
+    Parameters:
+    - dataset_dicts (list): List of dataset dictionaries.
+    - spine_metadata (dict): Metadata of the spine dataset.
+    - cfg (object): Configuration object for Detectron2.
+    - outputDir (str): Directory for outputting trained weights.
+    - toResume (bool): If true, resume training.
+    - weightPath (str): Path to model weights if not training.
+    - vis (bool): If true, visualize bounding boxes.
 
-	# build the directory
-	os.makedirs(cfg.OUTPUT_DIR, exist_ok=True)
+    Returns:
+    None.
+    """
 
-	# initialize the trainer object
-	trainer = SpineTrainer(cfg)
+    # VISUALIZATIONS FOR BOUNDING BOXES
+    if vis:
+        for d in dataset_dicts[:5]:
+            print(f"Visualizing GT data for {d['file_name']}")
+            img = cv2.imread(d["file_name"], cv2.IMREAD_GRAYSCALE)
+            print(f"Contains {len(d['annotations'])} boxes")
+            visualizer = Visualizer(
+                img[:, :], metadata=spine_metadata, scale=1)
+            out = visualizer.draw_dataset_dict(d)
+            plt.imshow(out.get_image()[:, :, ::-1])
+            plt.show()
 
-	# if we aren't training, pull the weights from the weight path 
-	if not train:
-		cfg.MODEL.WEIGHTS = os.path.join(cfg.OUTPUT_DIR, weightPath)
+    # Configuration settings
+    cfg = get_cfg_mod()
+    cfg.OUTPUT_DIR = os.path.join(cfg.OUTPUT_DIR, outputDir, 'weights')
+    os.makedirs(cfg.OUTPUT_DIR, exist_ok=True)
 
-	
-	trainer.resume_or_load(resume=toResume)
-	print('Resume? : ' + str(toResume))
+    # Initialize and set up trainer
+    trainer = SpineTrainer(cfg)
+    if not train:
+        cfg.MODEL.WEIGHTS = os.path.join(cfg.OUTPUT_DIR, weightPath)
+    trainer.resume_or_load(resume=toResume)
+    print(f'Resume? : {toResume}')
 
-	# manually set fan speed to high before training for temp control
-	os.system("nvidia-settings -a '[gpu:0]/GPUFanControlState=1'")
-	os.system("nvidia-settings -a '[fan:0]/GPUTargetFanSpeed=80'")
-	os.system("nvidia-settings -a '[fan:1]/GPUTargetFanSpeed=80'")
+    # Set GPU fan speed for temperature control
+    os.system("nvidia-settings -a '[gpu:0]/GPUFanControlState=1'")
+    os.system("nvidia-settings -a '[fan:0]/GPUTargetFanSpeed=80'")
+    os.system("nvidia-settings -a '[fan:1]/GPUTargetFanSpeed=80'")
 
-	trainer.train()
+    # Train
+    trainer.train()
 
-	# if training is manually stopped make sure to run the following command in terminal:
-	# nvidia-settings -a '[gpu:0]/GPUFanControlState=0'
-	os.system("nvidia-settings -a '[gpu:0]/GPUFanControlState=0'")
+    # Reset GPU fan speed
+    os.system("nvidia-settings -a '[gpu:0]/GPUFanControlState=0'")
+
+
+# Reminder:
+# if training is manually stopped make sure to run the following command in terminal:
+# nvidia-settings -a '[gpu:0]/GPUFanControlState=0'
